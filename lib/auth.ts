@@ -32,6 +32,16 @@ export async function createSessionToken(email: string): Promise<string> {
     .sign(secretKey());
 }
 
+export async function sessionEmail(req: { cookies: { get(name: string): { value: string } | undefined } }): Promise<string | null> {
+  const token = req.cookies.get("session")?.value;
+  if (!token) return null;
+  try {
+    return await verifySessionToken(token);
+  } catch {
+    return null;
+  }
+}
+
 export async function verifySessionToken(token: string): Promise<string> {
   const { payload } = await jwtVerify(token, secretKey());
   if (payload.purpose !== "session" || typeof payload.email !== "string") {

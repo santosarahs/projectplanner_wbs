@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import AppHeader from "@/components/AppHeader";
+import { normalizeName, type WbsSummary } from "@/lib/wbs";
 
 type Cell = string | number | null;
 
@@ -49,7 +52,7 @@ function rowStatus(keyUpdates: unknown, nextSteps: unknown): { label: string; cl
 export default function DashboardPage() {
   const [data, setData] = useState<WorkbookData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [email, setEmail] = useState<string | null>(null);
+  const [wbsList, setWbsList] = useState<WbsSummary[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<string>("");
   const [query, setQuery] = useState("");
   const [activeTeam, setActiveTeam] = useState("all");
@@ -78,16 +81,12 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((j) => setEmail(j.email));
     loadData();
+    fetch("/api/wbs")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: WbsSummary[]) => setWbsList(Array.isArray(list) ? list : []))
+      .catch(() => setWbsList([]));
   }, []);
-
-  async function onSignOut() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  }
 
   function onUploadClick() {
     fileInputRef.current?.click();
@@ -129,28 +128,16 @@ export default function DashboardPage() {
     );
   }
 
-  const sessionBar = (
-    <div className="session-bar">
-      {email && <span className="session-email mono">{email}</span>}
-      <button className="btn" onClick={onUploadClick}>
-        Upload new report
-      </button>
-      <button className="btn" onClick={onSignOut}>
-        Sign out
-      </button>
-    </div>
+  const uploadAction = (
+    <button className="btn" onClick={onUploadClick}>
+      Upload new report
+    </button>
   );
 
   if (data.sheetOrder.length === 0) {
     return (
       <div className="page">
-        <header className="topbar">
-          <div className="brand">
-            <span className="brand-mark">PM</span>
-            <h1>Project Master</h1>
-          </div>
-          {sessionBar}
-        </header>
+        <AppHeader actions={uploadAction} />
         {uploadStatus.kind !== "idle" && (
           <div className={`upload-status ${uploadStatus.kind}`}>{uploadStatus.message}</div>
         )}
@@ -200,34 +187,37 @@ export default function DashboardPage() {
     teamCounts.push({ name: team.name, count: (team.rows || []).length });
   });
 
+  const wbsByProject = new Map<string, WbsSummary>();
+  for (const w of wbsList) {
+    if (w.masterProject) wbsByProject.set(normalizeName(w.masterProject), w);
+  }
+
   const q = query.trim().toLowerCase();
   const visibleTeams = teams.filter((t) => validActiveTeam === "all" || t.name === validActiveTeam);
 
   return (
     <div className="page">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">PM</span>
-          <h1>Project Master</h1>
-        </div>
-        <div className="controls">
-          <select aria-label="Week" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
-            {data.sheetOrder.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <input
-            type="search"
-            aria-label="Search projects or leads"
-            placeholder="Search project or lead…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        {sessionBar}
-      </header>
+      <AppHeader
+        actions={uploadAction}
+        controls={
+          <>
+            <select aria-label="Week" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
+              {data.sheetOrder.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <input
+              type="search"
+              aria-label="Search projects or leads"
+              placeholder="Search project or lead…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </>
+        }
+      />
 
       {uploadStatus.kind !== "idle" && <div className={`upload-status ${uploadStatus.kind}`}>{uploadStatus.message}</div>}
 
@@ -342,7 +332,17 @@ export default function DashboardPage() {
                         return (
                           <tr key={`${team.name}-${idx}`}>
                             <td className="c-num mono">{typeof r[0] === "number" ? r[0] : ""}</td>
-                            <td className="c-proj">{String(r[projIdx] || "(untitled)")}</td>
+                            <td className="c-proj">
+                              {String(r[projIdx] || "(untitled)")}
+                              {(() => {
+                                const wbs = wbsByProject.get(normalizeName(String(r[projIdx] || "")));
+                                return wbs ? (
+                                  <Link className="wbs-link" href={`/wbs/${wbs.slug}`}>
+                                    WBS {Math.round(wbs.stats.progress * 100)}%
+                                  </Link>
+                                ) : null;
+                              })()}
+                            </td>
                             {layout.lead && <td className="c-lead">{leadIdx >= 0 ? r[leadIdx] ?? "" : ""}</td>}
                             {layout.date && <td className="c-date mono">{dateIdx >= 0 ? r[dateIdx] ?? "" : ""}</td>}
                             {layout.status && (

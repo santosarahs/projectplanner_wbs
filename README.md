@@ -56,6 +56,27 @@ upload `projectmaster.xlsx`. Each upload replaces the stored weekly reports
 with whatever sheets are in that file, so re-uploading after you add a new
 week's sheet is the normal weekly workflow.
 
+## WBS module
+
+`/wbs` holds a work breakdown structure per project, for the projects that need one.
+Upload a sheet laid out like the team template (one file per project):
+
+- A title block (`Project Title`, `Project Description`, `Unit`).
+- Two header rows: `Task Title` / `Category` / `Minutes` / `OWNER` / `%`, then one column per
+  unit (rooms, floors, sites), with optional group labels above them.
+- Phase rows (1, 2, 3) and task rows (1.1, 1.2...), one status code per unit:
+  `C` = Complete, `NR` = Not required, blank = Pending.
+
+Progress is calculated by the app, not read from the sheet: completed units out of the units
+where the task applies (`NR` excluded), weighted by minutes per unit. The `QTY`, `BDGT` and `%`
+columns are ignored. The estimate is planned hours plus 15% contingency.
+
+Anyone signed in can click a unit square to cycle Pending → Complete → Not required; changes
+save immediately. Re-uploading a sheet with the same project title replaces its tasks and
+statuses (including in-app edits) but keeps its link to the Project Master row. Link a WBS to a
+Project Master project from the WBS page and that project shows a WBS progress link on the
+dashboard.
+
 ## Local development
 
 ```
@@ -77,3 +98,5 @@ npm run dev
 - `lib/auth.ts` / `lib/allowlist.ts` — signed magic-link/session tokens and
   the email allowlist
 - `middleware.ts` — redirects unauthenticated requests to `/login`
+- `app/wbs/*`, `app/api/wbs/*` — WBS list, detail page and API
+- `lib/parseWbs.ts`, `lib/wbs.ts`, `lib/dbWbs.ts` — WBS parsing, shared calculations, storage

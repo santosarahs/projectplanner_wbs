@@ -22,7 +22,7 @@ export type ParsedWorkbook = {
 const EXCLUDED_SHEETS = new Set(["Sheet1", "Sheet2", "Sheet3"]);
 const CONTROL_LABELS = new Set(["Critical Issues or Delays", "Escalations or Support Needed"]);
 
-type Cell = string | number | null;
+export type Cell = string | number | null;
 
 function cellValue(cell: XLSX.CellObject | undefined): Cell {
   if (!cell || cell.v === undefined || cell.v === null) return null;
@@ -42,7 +42,7 @@ function cellValue(cell: XLSX.CellObject | undefined): Cell {
 // Reads a sheet into a fixed-width grid (like openpyxl's iter_rows), so that
 // a value's column *position* is meaningful and stable across rows -- the
 // parser below relies on that to tell a section heading apart from a data row.
-function sheetToGrid(ws: XLSX.WorkSheet): Cell[][] {
+export function sheetToGrid(ws: XLSX.WorkSheet): Cell[][] {
   if (!ws["!ref"]) return [];
   const range = XLSX.utils.decode_range(ws["!ref"]);
   const rows: Cell[][] = [];

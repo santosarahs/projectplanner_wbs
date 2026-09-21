@@ -24,7 +24,7 @@ function connectionString(): string {
   );
 }
 
-function getSql(): Sql {
+export function getSql(): Sql {
   if (!cachedSql) cachedSql = neon(connectionString());
   return cachedSql;
 }
