@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
+type Cell = string | number | null;
+
 type Team = {
   name: string;
   header: string[] | null;
-  rows: (string | number | null)[][];
+  rows: Cell[][];
   criticalIssues: string[];
   escalations: string[];
 };
@@ -18,10 +20,6 @@ type WorkbookData = {
   lastUploadedAt: string | null;
   lastUploadedBy: string | null;
 };
-
-function esc(s: unknown): string {
-  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
-}
 
 function isBlank(v: unknown): boolean {
   if (!v) return true;
@@ -46,15 +44,6 @@ function rowStatus(keyUpdates: unknown, nextSteps: unknown): { label: string; cl
   if (!isBlank(keyUpdates)) return { label: "Updated", cls: "ok" };
   if (isBlank(keyUpdates) && isBlank(nextSteps)) return { label: "No update", cls: "idle" };
   return { label: "Tracking", cls: "idle" };
-}
-
-function buildFieldBlocks(headerLabels: string[], values: (string | number | null)[], skipIdx: Set<number>) {
-  const blocks: { label: string; val: string | number | null }[] = [];
-  for (let i = 1; i < headerLabels.length; i++) {
-    if (skipIdx.has(i)) continue;
-    blocks.push({ label: headerLabels[i], val: values[i] });
-  }
-  return blocks;
 }
 
 export default function DashboardPage() {
@@ -100,7 +89,7 @@ export default function DashboardPage() {
     window.location.href = "/login";
   }
 
-  async function onUploadClick() {
+  function onUploadClick() {
     fileInputRef.current?.click();
   }
 
@@ -122,6 +111,8 @@ export default function DashboardPage() {
     }
   }
 
+  const uploadInput = <input ref={fileInputRef} type="file" accept=".xlsx" hidden onChange={onFileSelected} />;
+
   if (loadError) {
     return (
       <div className="page">
@@ -138,33 +129,40 @@ export default function DashboardPage() {
     );
   }
 
+  const sessionBar = (
+    <div className="session-bar">
+      {email && <span className="session-email mono">{email}</span>}
+      <button className="btn" onClick={onUploadClick}>
+        Upload new report
+      </button>
+      <button className="btn" onClick={onSignOut}>
+        Sign out
+      </button>
+    </div>
+  );
+
   if (data.sheetOrder.length === 0) {
     return (
       <div className="page">
         <header className="topbar">
           <div className="brand">
             <span className="brand-mark">PM</span>
-            <div className="brand-text">
-              <span className="eyebrow">Weekly Project Tracker</span>
-              <h1>Project Master</h1>
-            </div>
+            <h1>Project Master</h1>
           </div>
-          <div className="session-bar">
-            {email && <span className="session-email mono">{email}</span>}
-            <button className="btn" onClick={onSignOut}>
-              Sign out
-            </button>
-          </div>
+          {sessionBar}
         </header>
+        {uploadStatus.kind !== "idle" && (
+          <div className={`upload-status ${uploadStatus.kind}`}>{uploadStatus.message}</div>
+        )}
         <div className="empty-state">
           No reports uploaded yet. Upload your projectmaster.xlsx to get started.
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 12 }}>
             <button className="btn primary" onClick={onUploadClick}>
               Upload workbook
             </button>
           </div>
         </div>
-        <input ref={fileInputRef} type="file" accept=".xlsx" hidden onChange={onFileSelected} />
+        {uploadInput}
       </div>
     );
   }
@@ -185,10 +183,8 @@ export default function DashboardPage() {
     const nsIdx = findField(h, /next step/i);
     (team.rows || []).forEach((r) => {
       total++;
-      const ku = kuIdx >= 0 ? r[kuIdx] : null;
-      const ns = nsIdx >= 0 ? r[nsIdx] : null;
       if (kuIdx >= 0 || nsIdx >= 0) {
-        const st = rowStatus(ku, ns);
+        const st = rowStatus(kuIdx >= 0 ? r[kuIdx] : null, nsIdx >= 0 ? r[nsIdx] : null);
         if (st.cls === "ok") updated++;
         if (st.cls === "warn") onHold++;
       }
@@ -205,88 +201,54 @@ export default function DashboardPage() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark">PM</span>
-          <div className="brand-text">
-            <span className="eyebrow">Weekly Project Tracker</span>
-            <h1>Project Master</h1>
-          </div>
+          <h1>Project Master</h1>
         </div>
         <div className="controls">
-          <label className="field">
-            <span>Week</span>
-            <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
-              {data.sheetOrder.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field search-field">
-            <span>Search</span>
-            <input
-              type="search"
-              placeholder="Project or lead…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
+          <select aria-label="Week" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
+            {data.sheetOrder.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <input
+            type="search"
+            aria-label="Search projects or leads"
+            placeholder="Search project or lead…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
-        <div className="session-bar">
-          {email && <span className="session-email mono">{email}</span>}
-          <button className="btn" onClick={onUploadClick}>
-            Upload new report
-          </button>
-          <button className="btn" onClick={onSignOut}>
-            Sign out
-          </button>
-        </div>
+        {sessionBar}
       </header>
 
-      {uploadStatus.kind !== "idle" && (
-        <div
-          className={`upload-status${uploadStatus.kind === "error" ? " error" : ""}${
-            uploadStatus.kind === "ok" ? " success" : ""
-          }`}
-        >
-          {uploadStatus.message}
-        </div>
-      )}
+      {uploadStatus.kind !== "idle" && <div className={`upload-status ${uploadStatus.kind}`}>{uploadStatus.message}</div>}
 
-      <div className="meta-strip">
+      <div className="summary">
         <span>
           Reporting period <b>{sheet?.reportingDate || "—"}</b>
         </span>
-        <span className="dot">&middot;</span>
         <span>
-          Report generated <b>{sheet?.generatedDate || "—"}</b>
+          Generated <b>{sheet?.generatedDate || "—"}</b>
+        </span>
+        <span className="sep" aria-hidden="true" />
+        <span>
+          <b className="mono">{total}</b> projects
+        </span>
+        <span className="ok">
+          <b className="mono">{updated}</b> updated
+        </span>
+        <span className="warn">
+          <b className="mono">{onHold}</b> on hold
+        </span>
+        <span className="crit">
+          <b className="mono">{issues}</b> issues flagged
         </span>
       </div>
 
-      <section className="kpis">
-        <div className="kpi">
-          <div className="num mono">{total}</div>
-          <div className="lbl">Projects tracked</div>
-        </div>
-        <div className="kpi ok">
-          <div className="num mono">{updated}</div>
-          <div className="lbl">Updated this week</div>
-        </div>
-        <div className="kpi warn">
-          <div className="num mono">{onHold}</div>
-          <div className="lbl">On hold</div>
-        </div>
-        <div className="kpi crit">
-          <div className="num mono">{issues}</div>
-          <div className="lbl">Open issues flagged</div>
-        </div>
-      </section>
-
       <nav className="team-filter">
-        <button
-          className={`chip${validActiveTeam === "all" ? " active" : ""}`}
-          onClick={() => setActiveTeam("all")}
-        >
-          All teams <span className="count mono">{total}</span>
+        <button className={`chip${validActiveTeam === "all" ? " active" : ""}`} onClick={() => setActiveTeam("all")}>
+          All <span className="count mono">{total}</span>
         </button>
         {teamCounts.map((t) => (
           <button
@@ -310,10 +272,14 @@ export default function DashboardPage() {
           const dateIdx = findField(h, /date/i);
           const kuIdx = findField(h, /key updat/i);
           const nsIdx = findField(h, /next step/i);
+          const hasStatus = kuIdx >= 0 || nsIdx >= 0;
 
-          const skip = new Set<number>([projIdx]);
-          if (leadIdx >= 0) skip.add(leadIdx);
-          if (dateIdx >= 0) skip.add(dateIdx);
+          // Everything except project/lead/date and the dropped "Next steps" column is content.
+          const contentIdxs: number[] = [];
+          for (let i = 1; i < h.length; i++) {
+            if (i === projIdx || i === leadIdx || i === dateIdx || i === nsIdx) continue;
+            contentIdxs.push(i);
+          }
 
           let rows = team.rows || [];
           if (q) {
@@ -330,65 +296,62 @@ export default function DashboardPage() {
           return (
             <section className="team-panel" key={team.name}>
               <div className="team-head">
-                <div className="team-head-left">
-                  <h2>{team.name}</h2>
-                  <span className="team-count mono">{rows.length}</span>
-                </div>
+                <h2>{team.name}</h2>
+                <span className="team-count mono">{rows.length}</span>
                 {flagCount > 0 && <span className="issue-flag">{flagCount} flagged</span>}
               </div>
-              <div className="team-rows">
-                {rows.length === 0 ? (
-                  <div className="empty-state">No matching projects.</div>
-                ) : (
-                  rows.map((r, idx) => {
-                    const projectName = r[projIdx] || "(untitled)";
-                    const num = r[0];
-                    const lead = leadIdx >= 0 ? r[leadIdx] : null;
-                    const date = dateIdx >= 0 ? r[dateIdx] : null;
-                    const ku = kuIdx >= 0 ? r[kuIdx] : null;
-                    const ns = nsIdx >= 0 ? r[nsIdx] : null;
-                    const hasStatus = kuIdx >= 0 || nsIdx >= 0;
-                    const st = hasStatus ? rowStatus(ku, ns) : null;
-                    const blocks = buildFieldBlocks(h, r, skip);
 
-                    const metaBits: string[] = [];
-                    if (lead) metaBits.push(`Lead ${lead}`);
-                    if (date) metaBits.push(`Since ${date}`);
-
-                    return (
-                      <div className="project-row" key={`${team.name}-${idx}`}>
-                        <div className="row-head">
-                          <div className="row-title-block">
-                            <span className="row-num mono">{typeof num === "number" ? num : ""}</span>
-                            <div className="row-title-wrap">
-                              <div className="row-title">{String(projectName)}</div>
-                              {metaBits.length > 0 && <div className="row-meta">{metaBits.join(" · ")}</div>}
-                            </div>
-                          </div>
-                          {st && <span className={`status-pill ${st.cls}`}>{st.label}</span>}
-                        </div>
-                        {blocks.length > 0 && (
-                          <div className={`row-body${blocks.length > 1 ? "" : " single"}`}>
-                            {blocks.map((b, bi) => (
-                              <div className="field-block" key={bi}>
-                                <div className="f-label">{b.label}</div>
-                                <div className={`f-value${isBlank(b.val) ? " empty" : ""}`}>
-                                  {isBlank(b.val) ? "—" : String(b.val)}
-                                </div>
-                              </div>
+              {rows.length === 0 ? (
+                <div className="empty-state">No projects.</div>
+              ) : (
+                <div className="table-wrap">
+                  <table className="grid">
+                    <thead>
+                      <tr>
+                        <th className="c-num">#</th>
+                        <th className="c-proj">{h[projIdx]}</th>
+                        {leadIdx >= 0 && <th className="c-lead">{h[leadIdx]}</th>}
+                        {dateIdx >= 0 && <th className="c-date">{h[dateIdx]}</th>}
+                        {hasStatus && <th className="c-status">Status</th>}
+                        {contentIdxs.map((i) => (
+                          <th key={i} className="c-content">
+                            {h[i]}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r, idx) => {
+                        const st = hasStatus ? rowStatus(kuIdx >= 0 ? r[kuIdx] : null, nsIdx >= 0 ? r[nsIdx] : null) : null;
+                        return (
+                          <tr key={`${team.name}-${idx}`}>
+                            <td className="c-num mono">{typeof r[0] === "number" ? r[0] : ""}</td>
+                            <td className="c-proj">{String(r[projIdx] || "(untitled)")}</td>
+                            {leadIdx >= 0 && <td className="c-lead">{r[leadIdx] ?? ""}</td>}
+                            {dateIdx >= 0 && <td className="c-date mono">{r[dateIdx] ?? ""}</td>}
+                            {hasStatus && (
+                              <td className="c-status">
+                                {st && <span className={`st ${st.cls}`}>{st.label}</span>}
+                              </td>
+                            )}
+                            {contentIdxs.map((i) => (
+                              <td key={i} className={`c-content${isBlank(r[i]) ? " empty" : ""}`}>
+                                {isBlank(r[i]) ? "—" : String(r[i])}
+                              </td>
                             ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              {(team.criticalIssues?.length > 0 || team.escalations?.length > 0) && (
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {flagCount > 0 && (
                 <div className="callouts">
-                  {team.criticalIssues?.length > 0 && (
+                  {team.criticalIssues.length > 0 && (
                     <div className="callout">
-                      <div className="c-label">Critical issues or delays</div>
+                      <b>Critical issues or delays</b>
                       <ul>
                         {team.criticalIssues.map((i, ii) => (
                           <li key={ii}>{i}</li>
@@ -396,9 +359,9 @@ export default function DashboardPage() {
                       </ul>
                     </div>
                   )}
-                  {team.escalations?.length > 0 && (
+                  {team.escalations.length > 0 && (
                     <div className="callout warn">
-                      <div className="c-label">Escalations or support needed</div>
+                      <b>Escalations or support needed</b>
                       <ul>
                         {team.escalations.map((i, ii) => (
                           <li key={ii}>{i}</li>
@@ -414,7 +377,7 @@ export default function DashboardPage() {
       </main>
 
       <footer className="page-footer">
-        Source: projectmaster.xlsx &middot; {data.sheetOrder.length} weekly reports on file
+        {data.sheetOrder.length} weekly reports on file
         {data.lastUploadedAt && (
           <>
             {" "}
@@ -424,7 +387,7 @@ export default function DashboardPage() {
         )}
       </footer>
 
-      <input ref={fileInputRef} type="file" accept=".xlsx" hidden onChange={onFileSelected} />
+      {uploadInput}
     </div>
   );
 }
