@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   // allowlist, so this endpoint can't be used to enumerate valid emails.
   if (isAllowed(normalized)) {
     const token = await createMagicLinkToken(normalized);
-    const base = process.env.NEXT_PUBLIC_BASE_URL || `${req.nextUrl.protocol}//${req.headers.get("host")}`;
+    const base = process.env.BASE_URL || `${req.nextUrl.protocol}//${req.headers.get("host")}`;
     const link = `${base}/api/auth/verify?token=${encodeURIComponent(token)}`;
 
     const resend = new Resend(process.env.RESEND_API_KEY);

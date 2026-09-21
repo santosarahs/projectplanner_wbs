@@ -45,7 +45,7 @@ See `.env.example` for the full list. The two you must set by hand:
 | `RESEND_API_KEY` | From your Resend account |
 | `ALLOWED_EMAILS` | Comma-separated list of emails allowed to sign in |
 | `AUTH_SECRET` | Random string — generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
-| `NEXT_PUBLIC_BASE_URL` | Your deployed URL, e.g. `https://projectplanner-wbs.vercel.app` (set this after your first deploy, then redeploy) |
+| `BASE_URL` | Your deployed URL, e.g. `https://projectplanner-wbs.vercel.app` (set this after your first deploy, then redeploy) |
 
 `POSTGRES_URL` is set automatically once you attach the Neon database above.
 
