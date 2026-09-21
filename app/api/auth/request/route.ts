@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const link = `${base}/api/auth/verify?token=${encodeURIComponent(token)}`;
 
     const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: process.env.EMAIL_FROM || "Project Master <onboarding@resend.dev>",
       to: normalized,
       subject: "Sign in to Project Master",
@@ -35,6 +35,9 @@ export async function POST(req: NextRequest) {
         <p style="color:#888;font-size:12px;">If you didn't request this, you can ignore this email.</p>
       `,
     });
+    if (error) {
+      console.error("Resend failed to send sign-in email:", error);
+    }
   }
 
   return NextResponse.json({ ok: true });
