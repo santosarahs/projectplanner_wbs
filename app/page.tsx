@@ -73,7 +73,10 @@ export default function DashboardPage() {
   async function loadData() {
     try {
       const res = await fetch("/api/data", { cache: "no-store" });
-      if (!res.ok) throw new Error(`Server responded ${res.status}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ? `${body.error} (status ${res.status})` : `Server responded ${res.status}`);
+      }
       const json: WorkbookData = await res.json();
       setData(json);
       setLoadError(null);
