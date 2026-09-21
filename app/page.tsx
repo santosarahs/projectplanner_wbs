@@ -171,6 +171,13 @@ export default function DashboardPage() {
   const teams = (sheet?.teams || []).filter((t) => t.header && t.header.length);
   const validActiveTeam = teams.some((t) => t.name === activeTeam) ? activeTeam : "all";
 
+  // Same columns in every table of the week, so widths line up from team to team.
+  const layout = {
+    lead: teams.some((t) => findField(t.header as string[], /lead/i) >= 0),
+    date: teams.some((t) => findField(t.header as string[], /date/i) >= 0),
+    status: teams.some((t) => findField(t.header as string[], /key updat|next step/i) >= 0),
+  };
+
   let total = 0;
   let updated = 0;
   let onHold = 0;
@@ -280,6 +287,7 @@ export default function DashboardPage() {
             if (i === projIdx || i === leadIdx || i === dateIdx || i === nsIdx) continue;
             contentIdxs.push(i);
           }
+          const contentLabel = contentIdxs.length === 1 ? h[contentIdxs[0]] : "Key updates";
 
           let rows = team.rows || [];
           if (q) {
@@ -306,39 +314,43 @@ export default function DashboardPage() {
               ) : (
                 <div className="table-wrap">
                   <table className="grid">
+                    <colgroup>
+                      <col className="col-num" />
+                      <col className="col-proj" />
+                      {layout.lead && <col className="col-lead" />}
+                      {layout.date && <col className="col-date" />}
+                      {layout.status && <col className="col-status" />}
+                      <col className="col-content" />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th className="c-num">#</th>
                         <th className="c-proj">{h[projIdx]}</th>
-                        {leadIdx >= 0 && <th className="c-lead">{h[leadIdx]}</th>}
-                        {dateIdx >= 0 && <th className="c-date">{h[dateIdx]}</th>}
-                        {hasStatus && <th className="c-status">Status</th>}
-                        {contentIdxs.map((i) => (
-                          <th key={i} className="c-content">
-                            {h[i]}
-                          </th>
-                        ))}
+                        {layout.lead && <th className="c-lead">Lead</th>}
+                        {layout.date && <th className="c-date">Start date</th>}
+                        {layout.status && <th className="c-status">Status</th>}
+                        <th className="c-content">{contentLabel}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {rows.map((r, idx) => {
                         const st = hasStatus ? rowStatus(kuIdx >= 0 ? r[kuIdx] : null, nsIdx >= 0 ? r[nsIdx] : null) : null;
+                        const contentText = contentIdxs
+                          .filter((i) => !isBlank(r[i]))
+                          .map((i) => (contentIdxs.length > 1 ? `${h[i]}: ${r[i]}` : String(r[i])))
+                          .join("\n");
                         return (
                           <tr key={`${team.name}-${idx}`}>
                             <td className="c-num mono">{typeof r[0] === "number" ? r[0] : ""}</td>
                             <td className="c-proj">{String(r[projIdx] || "(untitled)")}</td>
-                            {leadIdx >= 0 && <td className="c-lead">{r[leadIdx] ?? ""}</td>}
-                            {dateIdx >= 0 && <td className="c-date mono">{r[dateIdx] ?? ""}</td>}
-                            {hasStatus && (
+                            {layout.lead && <td className="c-lead">{leadIdx >= 0 ? r[leadIdx] ?? "" : ""}</td>}
+                            {layout.date && <td className="c-date mono">{dateIdx >= 0 ? r[dateIdx] ?? "" : ""}</td>}
+                            {layout.status && (
                               <td className="c-status">
                                 {st && <span className={`st ${st.cls}`}>{st.label}</span>}
                               </td>
                             )}
-                            {contentIdxs.map((i) => (
-                              <td key={i} className={`c-content${isBlank(r[i]) ? " empty" : ""}`}>
-                                {isBlank(r[i]) ? "—" : String(r[i])}
-                              </td>
-                            ))}
+                            <td className={`c-content${contentText ? "" : " empty"}`}>{contentText || "—"}</td>
                           </tr>
                         );
                       })}

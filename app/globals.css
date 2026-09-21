@@ -232,6 +232,8 @@ main { display: flex; flex-direction: column; gap: 12px; }
 
 table.grid {
   width: 100%;
+  min-width: 760px;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 12.5px;
   line-height: 1.35;
@@ -243,6 +245,7 @@ table.grid {
   padding: 3px 8px;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 .grid thead th {
@@ -250,18 +253,22 @@ table.grid {
   color: var(--text-muted);
   font-size: 11.5px;
   font-weight: 600;
-  white-space: nowrap;
 }
 
 .grid tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface-2) 40%, transparent); }
 .grid tbody tr:hover { background: var(--accent-soft); }
 
-.grid .c-num { width: 1%; text-align: right; color: var(--text-faint); white-space: nowrap; }
-.grid .c-proj { min-width: 200px; max-width: 340px; font-weight: 600; }
-.grid .c-lead { white-space: nowrap; }
-.grid .c-date { white-space: nowrap; font-size: 11.5px; color: var(--text-muted); }
-.grid .c-status { white-space: nowrap; }
-.grid td.c-content { width: 100%; min-width: 280px; white-space: pre-line; }
+/* Fixed layout + shared widths: every table wraps its columns the same way. */
+col.col-num { width: 38px; }
+col.col-proj { width: 26%; }
+col.col-lead { width: 9%; }
+col.col-date { width: 92px; }
+col.col-status { width: 94px; }
+
+.grid .c-num { text-align: right; color: var(--text-faint); }
+.grid .c-proj { font-weight: 600; }
+.grid .c-date { font-size: 11.5px; color: var(--text-muted); }
+.grid td.c-content { white-space: pre-line; }
 .grid td.empty { color: var(--text-faint); }
 
 .st { font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
